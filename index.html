@@ -5,26 +5,26 @@
   <title>NOS RSS Ticker</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
- body {
-  background-color: transparent; /* Makes the background clear */
-  color: #ffffff;
-  font-family: 'Segoe UI', Arial, sans-serif;
-  overflow: hidden;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-}
+    body {
+      background-color: transparent;
+      color: #ffffff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+    }
     .ticker-container {
       width: 100%;
       overflow: hidden;
       white-space: nowrap;
       position: relative;
     }
-   .ticker-track {
-  display: inline-block;
-  white-space: nowrap;
-  animation: marquee 90s linear infinite; /* Increased from 45s to 90s */
-}
+    .ticker-track {
+      display: inline-block;
+      white-space: nowrap;
+      will-change: transform;
+    }
     .ticker-item {
       display: inline-block;
       font-size: 32px;
@@ -34,43 +34,99 @@
     }
     .ticker-item::after {
       content: "  •  ";
-      color: #e30613; /* NOS Red accent */
+      color: #e30613; /* NOS Red accent dot */
       font-weight: bold;
       margin-left: 30px;
-    }
-    @keyframes marquee {
-      0% { transform: translateX(100vw); }
-      100% { transform: translateX(-100%); }
     }
   </style>
 </head>
 <body>
 
-  <div class="ticker-container">
+  <div class="ticker-container" id="tickerContainer">
     <div class="ticker-track" id="tickerTrack">NOS Nieuws laden...</div>
   </div>
 
   <script>
     const RSS_URL = 'https://feeds.nos.nl/nosnieuwsalgemeen';
     const API_URL = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(RSS_URL);
+    
+    const track = document.getElementById('tickerTrack');
+    const container = document.getElementById('tickerContainer');
+    
+    let animationId = null;
+    let currentX = 0;
+    const speed = 1.5; // Adjust scrolling speed here (higher = faster, lower = slower)
+
+    // 1. Recover saved position or start fresh from browser memory
+    const savedX = localStorage.getItem('ticker_pos');
+    if (savedX !== null) {
+      currentX = parseFloat(savedX);
+    }
+
+    function renderHeadlines(items) {
+      const headlines = items.map(item => `<span class="ticker-item">${item.title}</span>`).join('');
+      // Duplicate items twice to ensure an endless loop without snapping
+      track.innerHTML = headlines + headlines + headlines;
+      startTicker();
+    }
+
+    function startTicker() {
+      function step() {
+        const trackWidth = track.scrollWidth / 3; // Width of one full data set
+        
+        // Move track to the left
+        currentX -= speed;
+        
+        // If it scrolls past one full block, loop seamlessly back without resetting visual position
+        if (Math.abs(currentX) >= trackWidth) {
+          currentX += trackWidth;
+        }
+
+        track.style.transform = `translateX(${currentX}px)`;
+        
+        // Continuously back up position to browser storage every frame
+        localStorage.setItem('ticker_pos', currentX);
+
+        animationId = requestAnimationFrame(step);
+      }
+
+      if (animationId) cancelAnimationFrame(animationId);
+      animationId = requestAnimationFrame(step);
+    }
 
     async function fetchRSS() {
       try {
         const response = await fetch(API_URL);
         const data = await response.json();
         if (data.status === 'ok' && data.items.length > 0) {
-          const headlines = data.items.map(item => `<span class="ticker-item">${item.title}</span>`).join('');
-          document.getElementById('tickerTrack').innerHTML = headlines + headlines;
+          // Save items to local storage so even offline/reloaded players instantly show content
+          localStorage.setItem('nos_ticker_items', JSON.stringify(data.items));
+          renderHeadlines(data.items);
         } else {
-          document.getElementById('tickerTrack').innerText = 'Kan NOS Nieuws feed niet laden.';
+          loadCachedDataOrFallback('Kan NOS Nieuws feed niet laden.');
         }
       } catch (err) {
-        document.getElementById('tickerTrack').innerText = 'Fout bij het ophalen van het nieuws.';
+        loadCachedDataOrFallback('Fout bij het ophalen van het nieuws.');
       }
     }
 
+    function loadCachedDataOrFallback(fallbackText) {
+      const cached = localStorage.getItem('nos_ticker_items');
+      if (cached) {
+        renderHeadlines(JSON.parse(cached));
+      } else {
+        track.innerText = fallbackText;
+      }
+    }
+
+    // Initialize: Try cache first for instant load, then fetch fresh data
+    const cachedItems = localStorage.getItem('nos_ticker_items');
+    if (cachedItems) {
+      renderHeadlines(JSON.parse(cachedItems));
+    }
+
     fetchRSS();
-    setInterval(fetchRSS, 10 * 60 * 1000);
+    setInterval(fetchRSS, 10 * 60 * 1000); // Check for fresh news every 10 minutes
   </script>
 
 </body>
