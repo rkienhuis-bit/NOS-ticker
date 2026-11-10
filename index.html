@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <title>NOS RSS Ticker</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #111111;
+      color: #ffffff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+    }
+    .ticker-container {
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+    .ticker-track {
+      display: inline-block;
+      white-space: nowrap;
+      animation: marquee 45s linear infinite;
+    }
+    .ticker-item {
+      display: inline-block;
+      font-size: 32px;
+      font-weight: 600;
+      padding: 0 30px;
+      color: #ffffff;
+    }
+    .ticker-item::after {
+      content: "  •  ";
+      color: #e30613; /* NOS Red accent */
+      font-weight: bold;
+      margin-left: 30px;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(100vw); }
+      100% { transform: translateX(-100%); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ticker-container">
+    <div class="ticker-track" id="tickerTrack">NOS Nieuws laden...</div>
+  </div>
+
+  <script>
+    const RSS_URL = 'https://feeds.nos.nl/nosnieuwsalgemeen';
+    const API_URL = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(RSS_URL);
+
+    async function fetchRSS() {
+      try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+        if (data.status === 'ok' && data.items.length > 0) {
+          const headlines = data.items.map(item => `<span class="ticker-item">${item.title}</span>`).join('');
+          document.getElementById('tickerTrack').innerHTML = headlines + headlines;
+        } else {
+          document.getElementById('tickerTrack').innerText = 'Kan NOS Nieuws feed niet laden.';
+        }
+      } catch (err) {
+        document.getElementById('tickerTrack').innerText = 'Fout bij het ophalen van het nieuws.';
+      }
+    }
+
+    fetchRSS();
+    setInterval(fetchRSS, 10 * 60 * 1000);
+  </script>
+
+</body>
+</html>
