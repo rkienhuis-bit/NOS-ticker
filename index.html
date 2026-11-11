@@ -24,19 +24,26 @@
       display: inline-block;
       white-space: nowrap;
       will-change: transform;
+      animation: tickerScroll 45s linear infinite; /* Adjust speed here: lower seconds = faster, higher = slower */
     }
     .ticker-item {
       display: inline-block;
-      font-size: 32px;
+      font-size: 24px; /* Reduced font size */
       font-weight: 600;
-      padding: 0 30px;
+      padding: 0 15px;
       color: #ffffff;
     }
     .ticker-item::after {
-      content: "  •  ";
+      content: " • ";
       color: #e30613; /* NOS Red accent dot */
       font-weight: bold;
-      margin-left: 30px;
+      margin-left: 15px;
+      margin-right: 10px;
+    }
+
+    @keyframes tickerScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-33.333%); } /* Scrolls precisely one full block of duplicated data */
     }
   </style>
 </head>
@@ -49,49 +56,13 @@
   <script>
     const RSS_URL = 'https://feeds.nos.nl/nosnieuwsalgemeen';
     const API_URL = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(RSS_URL);
-    
+     
     const track = document.getElementById('tickerTrack');
-    const container = document.getElementById('tickerContainer');
-    
-    let animationId = null;
-    let currentX = 0;
-    const speed = 1.5; // Adjust scrolling speed here (higher = faster, lower = slower)
-
-    // 1. Recover saved position or start fresh from browser memory
-    const savedX = localStorage.getItem('ticker_pos');
-    if (savedX !== null) {
-      currentX = parseFloat(savedX);
-    }
 
     function renderHeadlines(items) {
       const headlines = items.map(item => `<span class="ticker-item">${item.title}</span>`).join('');
-      // Duplicate items twice to ensure an endless loop without snapping
+      // Duplicate 3 times to ensure a seamless CSS loop without visual gaps
       track.innerHTML = headlines + headlines + headlines;
-      startTicker();
-    }
-
-    function startTicker() {
-      function step() {
-        const trackWidth = track.scrollWidth / 3; // Width of one full data set
-        
-        // Move track to the left
-        currentX -= speed;
-        
-        // If it scrolls past one full block, loop seamlessly back without resetting visual position
-        if (Math.abs(currentX) >= trackWidth) {
-          currentX += trackWidth;
-        }
-
-        track.style.transform = `translateX(${currentX}px)`;
-        
-        // Continuously back up position to browser storage every frame
-        localStorage.setItem('ticker_pos', currentX);
-
-        animationId = requestAnimationFrame(step);
-      }
-
-      if (animationId) cancelAnimationFrame(animationId);
-      animationId = requestAnimationFrame(step);
     }
 
     async function fetchRSS() {
@@ -99,7 +70,6 @@
         const response = await fetch(API_URL);
         const data = await response.json();
         if (data.status === 'ok' && data.items.length > 0) {
-          // Save items to local storage so even offline/reloaded players instantly show content
           localStorage.setItem('nos_ticker_items', JSON.stringify(data.items));
           renderHeadlines(data.items);
         } else {
@@ -119,14 +89,14 @@
       }
     }
 
-    // Initialize: Try cache first for instant load, then fetch fresh data
+    // Initialize cache first, then fetch fresh data
     const cachedItems = localStorage.getItem('nos_ticker_items');
     if (cachedItems) {
       renderHeadlines(JSON.parse(cachedItems));
     }
 
     fetchRSS();
-    setInterval(fetchRSS, 10 * 60 * 1000); // Check for fresh news every 10 minutes
+    setInterval(fetchRSS, 3 * 60 * 1000); // Check for fresh news every 3 minutes
   </script>
 
 </body>
